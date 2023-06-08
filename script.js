@@ -1,55 +1,52 @@
 import { spawn } from 'child_process'
-import fs from 'fs/promises'
+import { writeFile } from 'fs/promises'
+import fs from 'fs'
+import path from 'path';
 
-spawn('mkdir', ['logs'])
+
+if (!fs.existsSync('./Logs')) {
+    fs.mkdirSync('./Logs');
+}
+const result = {
+    start: getTime(),
+    duration: null,
+    success: true,
+    commandSuccess: true,
+    error: null
+}
+
 async function saveStatistics(command, args = [], timeout) {
 
-    const childProcess = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], timeout: timeout })
+    const childProcess = spawn(command, args, { timeout: timeout })
+    const fileName = `${result.start}_${command}.json`
 
-    const result = {
-        start: getTime(),
-        duration: null,
-        success: true,
-        commandSuccess: true,
-        error: null
-    }
-
-    const fileName = `${result.start}_${command}.JSON`
-
-     childProcess.on('close', async () => {
+    childProcess.on('close', () => {
         result.duration = getDuration(result.start)
-        try{
-            console.log('close');
-            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
-        }
-        catch(err){
-            console.log(err);
-        }
+
+        return new Promise((resolve, reject) => {
+            writeFile(path.join('./Logs', fileName), JSON.stringify(result))
+                .then(() => {
+                    console.log('Successfully saved!');
+                    resolve('Successfully saved!')
+                })
+                .catch(err => {
+                    reject(err)
+                }
+                )
+        })
+
     })
 
-    childProcess.on('error', async (err) => {
-        result.duration = getDuration(result.start)
+    childProcess.on('error', (err) => {
         result.error = err
         result.commandSuccess = false
-        try{
-            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
-        }
-        catch(err){
-            console.log(err);
-        }
+
     })
 
-    childProcess.stderr.on('data',async (data) => {
-        result.duration = getDuration(result.start)
+    childProcess.stderr.on('data', (data) => {
         result.success = false
         result.error = err
-        try{
-            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
-        }
-        catch(err){
-            console.log(err);
-        }
-    })
+    })git 
 
 }
 
@@ -62,5 +59,5 @@ function getDuration(start) {
     return getTime() - start
 }
 
-await saveStatistics('node', ['-v'], 8)
 
+await saveStatistics('node', ['-v'], 8)
