@@ -46,7 +46,7 @@ async function saveStatistics(command, args = [], timeout) {
     childProcess.stderr.on('data', (data) => {
         result.success = false
         result.error = err
-    })git 
+    })
 
 }
 
