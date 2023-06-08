@@ -1,15 +1,10 @@
 import { spawn } from 'child_process'
-import fs from 'fs'
+import fs from 'fs/promises'
 
-///// with infinity I got error: "The value of "timeout" is out of range."
-async function saveStatistics(command, args = [], timeout = 9999999999999) {
-    process.on('error', () => {
-        console.log('hru');
-        result.error = err
+spawn('mkdir', ['logs'])
+async function saveStatistics(command, args = [], timeout) {
 
-    })
-
-    const childProcess = spawn(command, args, { timeout: timeout })
+    const childProcess = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'], timeout: timeout })
 
     const result = {
         start: getTime(),
@@ -21,60 +16,51 @@ async function saveStatistics(command, args = [], timeout = 9999999999999) {
 
     const fileName = `${result.start}_${command}.JSON`
 
-    // childProcess.on('timeout', () => {
-    //     console.log('Child process terminated due to timeout.');
-    //     result.error = 'Not enough time'
-    // });
-
-    childProcess.on('close', () => {
+     childProcess.on('close', async () => {
         result.duration = getDuration(result.start)
-        stampResullt(fileName, result)
+        try{
+            console.log('close');
+            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
+        }
+        catch(err){
+            console.log(err);
+        }
     })
 
-    childProcess.on('error', (err) => {
+    childProcess.on('error', async (err) => {
         result.duration = getDuration(result.start)
         result.error = err
         result.commandSuccess = false
-        stampResullt(fileName, result)
+        try{
+            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
+        }
+        catch(err){
+            console.log(err);
+        }
     })
 
-    process
-        .on('unhandledRejection', (reason) => {
-            result.duration = getDuration(result.start)
-            result.success = false
-            result.error = reason
-
-        })
-        .on('uncaughtException', err => {
-            result.duration = getDuration(result.start)
-            result.success = false
-            result.error = err
-            stampResullt(fileName, result)
-
-        });
+    childProcess.stderr.on('data',async (data) => {
+        result.duration = getDuration(result.start)
+        result.success = false
+        result.error = err
+        try{
+            await fs.writeFile('./logs/' + fileName, JSON.stringify(result))
+        }
+        catch(err){
+            console.log(err);
+        }
+    })
 
 }
 
 
-function stampResullt(filename, result) {
-    spawn('mkdir', ['logs'])
-        .on('exit',
-            () => {
-                fs.writeFile('./logs/' + filename, JSON.stringify(result), (err) => {
-                    if (err)
-                        console.log(err);
-                })
-            }
-        )
-}
+
 function getTime() {
     return Date.now()
 }
 function getDuration(start) {
-    return  getTime() - start
+    return getTime() - start
 }
 
-await saveStatistics('npm', ['--v'], 8)
-
-
+await saveStatistics('node', ['-v'], 8)
 
